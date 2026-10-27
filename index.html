@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PolicyLens – Policy Document Conflict &amp; Consistency Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F3F6FA; --card:#FFFFFF; --ink:#12233D; --muted:#5A6B85; --line:#D5DDE8;
+  --lens:#1F4FD8; --lens-soft:#E3EAFB;
+  --clash:#C2255C; --clash-soft:#FBE4EC;
+  --warn:#B96A00; --warn-soft:#FDF0D9;
+  --ok:#0F7B6C; --ok-soft:#DDF3EE;
+  --head:'Bricolage Grotesque','Segoe UI',system-ui,sans-serif;
+  --body:'Source Serif 4',Georgia,'Times New Roman',serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:18px;line-height:1.65}
+a{color:inherit}
+:focus-visible{outline:3px solid var(--lens);outline-offset:3px;border-radius:4px}
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+h1,h2,h3{font-family:var(--head);line-height:1.1;letter-spacing:-.02em}
+
+/* nav */
+header{position:sticky;top:0;z-index:20;background:rgba(243,246,250,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.nav{display:flex;align-items:center;justify-content:space-between;height:64px}
+.logo{display:flex;align-items:center;gap:10px;font-family:var(--head);font-weight:800;font-size:22px;text-decoration:none}
+.logo svg{width:30px;height:30px}
+nav a{font-family:var(--head);font-weight:500;font-size:16px;text-decoration:none;margin-left:26px;color:var(--muted)}
+nav a:hover{color:var(--ink)}
+.btn{font-family:var(--head);font-weight:700;font-size:16px;border:0;border-radius:10px;padding:13px 22px;cursor:pointer;background:var(--lens);color:#fff;text-decoration:none;display:inline-block}
+.btn:hover{background:#173fb0}
+.btn.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--ink)}
+.btn.ghost:hover{background:var(--ink);color:#fff}
+nav .btn{margin-left:26px;padding:9px 16px;color:#fff}
+
+/* hero */
+.hero{padding:72px 0 40px}
+.hero h1{font-size:clamp(40px,6.4vw,76px);font-weight:800;max-width:900px}
+.hero h1 span{background:linear-gradient(transparent 62%,var(--clash-soft) 62%);}
+.hero p.lead{max-width:640px;font-size:21px;color:var(--muted);margin:22px 0 0}
+
+/* analyzer */
+.lab{background:var(--card);border:1.5px solid var(--ink);border-radius:18px;margin-top:44px;overflow:hidden;box-shadow:8px 8px 0 var(--lens-soft)}
+.lab-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1.5px solid var(--ink);background:var(--lens-soft)}
+.lab-bar strong{font-family:var(--head);font-size:17px}
+.lab-bar div{display:flex;gap:10px}
+.lab-bar .btn{padding:9px 16px;font-size:15px}
+.docs{display:grid;grid-template-columns:1fr 1fr}
+.doc{padding:16px 18px}
+.doc+.doc{border-left:1.5px solid var(--line)}
+.doc label{font-family:var(--head);font-weight:700;font-size:15px;display:block;margin-bottom:8px}
+.doc textarea{width:100%;height:230px;resize:vertical;border:1px solid var(--line);border-radius:10px;padding:12px;font:16px/1.55 var(--body);color:var(--ink);background:var(--paper)}
+#results{border-top:1.5px solid var(--ink);padding:22px 18px;display:none}
+.summary{display:flex;flex-wrap:wrap;gap:22px;align-items:center;margin-bottom:20px}
+.gauge{position:relative;width:110px;height:110px;flex:none}
+.gauge svg{transform:rotate(-90deg)}
+.gauge b{position:absolute;inset:0;display:grid;place-items:center;font:800 28px var(--head)}
+.stats{display:flex;flex-wrap:wrap;gap:10px}
+.chip{font-family:var(--head);font-weight:700;font-size:15px;padding:6px 14px;border-radius:99px}
+.chip.c{background:var(--clash-soft);color:var(--clash)}
+.chip.w{background:var(--warn-soft);color:var(--warn)}
+.chip.o{background:var(--ok-soft);color:var(--ok)}
+.finding{border:1px solid var(--line);border-left:6px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px}
+.finding.high{border-left-color:var(--clash)}
+.finding.med{border-left-color:var(--warn)}
+.finding.ok{border-left-color:var(--ok)}
+.finding h3{font-size:18px;margin-bottom:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.tag{font:700 13px var(--head);padding:3px 10px;border-radius:99px}
+.high .tag{background:var(--clash-soft);color:var(--clash)}
+.med .tag{background:var(--warn-soft);color:var(--warn)}
+.ok .tag{background:var(--ok-soft);color:var(--ok)}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:16px}
+.pair p{background:var(--paper);border-radius:8px;padding:10px 12px}
+.pair small{display:block;font:700 13px var(--head);color:var(--muted);margin-bottom:2px}
+mark{background:#FFE58A;color:inherit;padding:0 3px;border-radius:3px}
+.fix{font-size:15.5px;color:var(--muted);margin-top:10px}
+.empty{color:var(--muted);font-size:16px}
+
+/* sections */
+section{padding:84px 0}
+section h2{font-size:clamp(30px,4.2vw,46px);font-weight:800;max-width:700px}
+.sub{color:var(--muted);max-width:620px;margin:14px 0 40px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+.feat{border-top:3px solid var(--ink);padding-top:16px}
+.feat:nth-child(3n+2){border-color:var(--lens)}
+.feat:nth-child(3n){border-color:var(--clash)}
+.feat h3{font-size:21px;margin-bottom:8px}
+.feat p{color:var(--muted);font-size:17px}
+.band{background:var(--ink);color:#EAF0FA}
+.band .sub{color:#A9B8D2}
+.steps{list-style:none;display:grid;grid-template-columns:repeat(4,1fr);gap:20px;counter-reset:s}
+.steps li{counter-increment:s;border:1.5px solid #3A4D70;border-radius:14px;padding:20px}
+.steps li::before{content:counter(s);font:800 34px var(--head);color:#7FA2FF;display:block;margin-bottom:6px}
+.steps h3{font-size:19px;margin-bottom:6px}
+.steps p{font-size:16px;color:#A9B8D2}
+.cases{display:grid;grid-template-columns:repeat(2,1fr);gap:22px}
+.case{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:24px}
+.case h3{font-size:21px;margin-bottom:8px}
+.case p{color:var(--muted);font-size:17px}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:10px}
+.metrics div{font-family:var(--head)}
+.metrics b{display:block;font-size:44px;font-weight:800;color:var(--lens)}
+.metrics span{color:var(--muted);font-size:16px}
+details{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin-bottom:12px;max-width:780px}
+summary{font-family:var(--head);font-weight:700;font-size:18px;cursor:pointer}
+details p{margin-top:10px;color:var(--muted);font-size:17px}
+.cta{background:var(--lens);color:#fff;border-radius:22px;padding:56px 40px;text-align:center}
+.cta h2{margin:0 auto}
+.cta p{margin:14px auto 26px;max-width:520px;color:#D6E0FF}
+.cta .btn{background:#fff;color:var(--lens)}
+footer{padding:36px 0;color:var(--muted);font-size:15px;border-top:1px solid var(--line)}
+footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
+
+@media(max-width:860px){
+  .docs,.pair{grid-template-columns:1fr}
+  .doc+.doc{border-left:0;border-top:1.5px solid var(--line)}
+  .grid3,.steps,.cases,.metrics{grid-template-columns:1fr}
+  nav a:not(.btn){display:none}
+  section{padding:60px 0}
+}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <a class="logo" href="#top" aria-label="PolicyLens home">
+      <svg viewBox="0 0 32 32" fill="none"><circle cx="13" cy="13" r="9" stroke="#12233D" stroke-width="3"/><path d="M20 20l8 8" stroke="#12233D" stroke-width="3" stroke-linecap="round"/><path d="M9 11h8M9 15h5" stroke="#C2255C" stroke-width="2.4" stroke-linecap="round"/></svg>
+      PolicyLens
+    </a>
+    <nav>
+      <a href="#features">Features</a><a href="#how">How it works</a><a href="#uses">Use cases</a><a href="#faq">FAQ</a>
+      <a class="btn" href="#analyzer">Try the analyzer</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+<div class="wrap hero">
+  <h1>Find where your policies <span>contradict</span> each other.</h1>
+  <p class="lead">PolicyLens reads your policy documents side by side and flags conflicting values, clashing obligations, and gaps before an auditor or a regulator does.</p>
+
+  <div class="lab" id="analyzer">
+    <div class="lab-bar">
+      <strong>Live analyzer – paste two policy texts</strong>
+      <div>
+        <button class="btn ghost" id="sample" type="button">Load sample</button>
+        <button class="btn ghost" id="clear" type="button">Clear</button>
+        <button class="btn" id="run" type="button">Analyze</button>
+      </div>
+    </div>
+    <div class="docs">
+      <div class="doc"><label for="a">Document A</label><textarea id="a" placeholder="Paste the first policy here…"></textarea></div>
+      <div class="doc"><label for="b">Document B</label><textarea id="b" placeholder="Paste the second policy here…"></textarea></div>
+    </div>
+    <div id="results" aria-live="polite"></div>
+  </div>
+</div>
+
+<section id="features">
+  <div class="wrap">
+    <h2>Built to catch what a manual read-through misses</h2>
+    <p class="sub">Policies grow by amendment. PolicyLens compares them clause by clause so inconsistencies surface while they are still cheap to fix.</p>
+    <div class="grid3">
+      <div class="feat"><h3>Conflict detection</h3><p>Finds clauses on the same topic that disagree on deadlines, limits, amounts, or whether something is allowed.</p></div>
+      <div class="feat"><h3>Consistency scoring</h3><p>Each comparison gets a score, so you can track alignment across a document set and see it improve.</p></div>
+      <div class="feat"><h3>Obligation strength</h3><p>Separates "must" from "may," so a mandatory rule in one document is not quietly softened in another.</p></div>
+      <div class="feat"><h3>Side-by-side evidence</h3><p>Every finding shows both source sentences with the conflicting values highlighted.</p></div>
+      <div class="feat"><h3>Suggested fixes</h3><p>Each issue comes with a plain-language next step: align the value, name an owner, or merge the clauses.</p></div>
+      <div class="feat"><h3>Private by design</h3><p>The demo above runs entirely in your browser. Nothing you paste leaves your device.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="how" class="band">
+  <div class="wrap">
+    <h2>From two documents to a fix list in four steps</h2>
+    <p class="sub">The same pipeline runs in the demo above.</p>
+    <ol class="steps">
+      <li><h3>Split</h3><p>Each document is broken into individual clauses.</p></li>
+      <li><h3>Match</h3><p>Clauses that cover the same topic are paired by shared key terms.</p></li>
+      <li><h3>Compare</h3><p>Paired clauses are checked for different values, opposite rules, and mismatched strength.</p></li>
+      <li><h3>Report</h3><p>You get ranked findings, a consistency score, and a suggested fix for each.</p></li>
+    </ol>
+  </div>
+</section>
+
+<section id="uses">
+  <div class="wrap">
+    <h2>Where teams use PolicyLens</h2>
+    <p class="sub">Anywhere more than one document claims to be the rule.</p>
+    <div class="cases">
+      <div class="case"><h3>Compliance and audit</h3><p>Check internal controls against each other and against regulation summaries before an audit begins.</p></div>
+      <div class="case"><h3>HR and operations</h3><p>Keep handbooks, leave rules, and expense policies aligned across departments and regions.</p></div>
+      <div class="case"><h3>Legal and contracts</h3><p>Spot clauses in master agreements and addenda that give different answers to the same question.</p></div>
+      <div class="case"><h3>Public sector</h3><p>Reconcile overlapping guidelines issued by different agencies or updated across versions.</p></div>
+    </div>
+    <div class="metrics" style="margin-top:56px">
+      <div><b>3</b><span>conflict types detected: value, obligation, strength</span></div>
+      <div><b>0</b><span>bytes uploaded in the browser demo</span></div>
+      <div><b>&lt;1s</b><span>to compare two typical policy pages</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="faq" style="padding-top:20px">
+  <div class="wrap">
+    <h2>Questions</h2>
+    <p class="sub">A few things people ask before trying it.</p>
+    <details><summary>How does the analyzer decide two clauses are related?</summary><p>It compares the key terms in each sentence, ignoring common words. Sentences that share enough of them are treated as covering the same topic.</p></details>
+    <details><summary>What kinds of conflicts does it find?</summary><p>Different numbers with the same unit (days, hours, percent, money), opposite permissions such as "must not" versus "may," and a required rule that another document treats as optional.</p></details>
+    <details><summary>Is it a replacement for legal review?</summary><p>No. It is a fast first pass that points reviewers to the clauses worth reading closely. Wording and context still need a person's judgment.</p></details>
+    <details><summary>Is my text sent anywhere?</summary><p>No. This page analyzes text locally in your browser.</p></details>
+  </div>
+</section>
+
+<section style="padding-top:0">
+  <div class="wrap">
+    <div class="cta">
+      <h2>Run your first comparison</h2>
+      <p>Paste two policies into the analyzer and see where they disagree.</p>
+      <a class="btn" href="#analyzer">Open the analyzer</a>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer><div class="wrap"><span>© 2026 PolicyLens</span><span>Policy Document Conflict &amp; Consistency Analysis System</span></div></footer>
+
+<script>
+const SAMPLE_A = "Employees must submit expense reports within 30 days of purchase. Remote work is permitted up to 3 days per week. Employees must not use personal devices for confidential data. Annual leave requests require manager approval 14 days in advance. All security incidents shall be reported within 24 hours.";
+const SAMPLE_B = "Expense reports shall be submitted within 60 days of purchase. Remote work may be approved for up to 3 days per week. Personal devices may be used to access confidential data with encryption. Annual leave requests require approval at least 14 days in advance. Security incidents may be reported within 72 hours.";
+
+const $ = id => document.getElementById(id);
+const STOP = new Set("with that this from have will shall must they their than which within least also such each other into only when upon been were being should would could about after before more most some".split(" "));
+const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+const split = t => t.split(/(?<=[.;!?])\s+|\n+/).map(s => s.trim()).filter(s => s.length > 15);
+const stem = w => w.replace(/(ing|ed|es|s)$/, "");
+const terms = s => new Set(s.toLowerCase().replace(/[^a-z\s]/g, " ").split(/\s+/).filter(w => w.length > 3 && !STOP.has(w)).map(stem));
+
+const NUM_RE = /(\$)?\s?(\d[\d,]*(?:\.\d+)?)\s*(%|percent|business days?|days?|hours?|weeks?|months?|years?)?/gi;
+function nums(s){
+  const out = [];
+  for (const m of s.matchAll(NUM_RE)) {
+    let unit = m[1] ? "$" : (m[3] || "").toLowerCase().replace(/s$/, "");
+    if (unit === "percent") unit = "%";
+    if (!unit) continue;
+    out.push({ v: parseFloat(m[2].replace(/,/g, "")), unit });
+  }
+  return out;
+}
+function stance(s){
+  const l = s.toLowerCase();
+  if (/\b(must not|shall not|may not|cannot|can not|prohibited|not permitted|not allowed|forbidden|never)\b/.test(l)) return "forbid";
+  if (/\b(must|shall|required|requires|mandatory)\b/.test(l)) return "require";
+  if (/\b(may|can|optional|permitted|allowed|approved)\b/.test(l)) return "allow";
+  return "none";
+}
+function highlight(s){ return esc(s).replace(/(\$\s?)?\d[\d,]*(?:\.\d+)?\s*(%|percent|business days?|days?|hours?|weeks?|months?|years?)?/gi, m => `<mark>${m}</mark>`); }
+function modal(s){ const m = s.match(/\b(must not|shall not|may not|cannot|prohibited|not permitted|must|shall|required|requires|mandatory|may|can|permitted|allowed|approved)\b/i); return m ? m[0] : null; }
+function hlModal(s){ let h = highlight(s); const m = modal(s); return m ? h.replace(new RegExp("\\b"+m+"\\b","i"), x => `<mark>${x}</mark>`) : h; }
+
+function analyze(A, B){
+  const sa = split(A), sb = split(B).map(t => ({ t, k: terms(t) }));
+  const findings = [];
+  sa.forEach(a => {
+    const ka = terms(a);
+    let best = null, bs = 0;
+    sb.forEach(b => {
+      let shared = 0; ka.forEach(w => b.k.has(w) && shared++);
+      const score = shared / (new Set([...ka, ...b.k]).size || 1);
+      if (shared >= 2 && score > bs) { bs = score; best = b; }
+    });
+    if (!best || bs < 0.28) return;
+    const b = best.t, issues = [];
+    const na = nums(a), nb = nums(b);
+    for (const x of na) {
+      const same = nb.filter(y => y.unit === x.unit);
+      if (same.length && !same.some(y => y.v === x.v)) {
+        issues.push({ sev: "high", type: "Value mismatch",
+          fix: `One document says ${x.v} ${x.unit}, the other says ${same[0].v} ${same[0].unit}. Choose one value and update both documents.` });
+        break;
+      }
+    }
+    const pa = stance(a), pb = stance(b);
+    if ((pa === "forbid" && (pb === "allow" || pb === "require")) || (pb === "forbid" && (pa === "allow" || pa === "require"))) {
+      issues.push({ sev: "high", type: "Contradictory rule", fix: "One clause prohibits what the other permits or requires. Decide which applies and remove or reword the other." });
+    } else if ((pa === "require" && pb === "allow") || (pa === "allow" && pb === "require")) {
+      issues.push({ sev: "med", type: "Obligation strength", fix: "One clause makes this mandatory while the other makes it optional. Align the strength of the wording." });
+    }
+    findings.push({ a, b, issues, sim: bs });
+  });
+  return findings;
+}
+
+function render(f){
+  const box = $("results");
+  box.style.display = "block";
+  if (!f.length) {
+    box.innerHTML = '<p class="empty">No related clauses found. Try longer passages, or documents that cover the same topics.</p>';
+    return;
+  }
+  const bad = f.filter(x => x.issues.some(i => i.sev === "high")).length;
+  const med = f.filter(x => !x.issues.some(i => i.sev === "high") && x.issues.length).length;
+  const ok = f.length - bad - med;
+  const score = Math.round((ok / f.length) * 100);
+  const col = score >= 75 ? "var(--ok)" : score >= 40 ? "var(--warn)" : "var(--clash)";
+  const C = 2 * Math.PI * 46;
+  let html = `<div class="summary">
+    <div class="gauge"><svg width="110" height="110" viewBox="0 0 110 110"><circle cx="55" cy="55" r="46" fill="none" stroke="#E3EAF3" stroke-width="10"/><circle cx="55" cy="55" r="46" fill="none" stroke="${col}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - score / 100)}"/></svg><b>${score}%</b></div>
+    <div><h3 style="font-size:22px;margin-bottom:8px">Consistency score</h3>
+    <div class="stats"><span class="chip c">${bad} conflict${bad === 1 ? "" : "s"}</span><span class="chip w">${med} warning${med === 1 ? "" : "s"}</span><span class="chip o">${ok} consistent</span></div></div></div>`;
+  const order = x => x.issues.some(i => i.sev === "high") ? 0 : x.issues.length ? 1 : 2;
+  f.sort((x, y) => order(x) - order(y)).forEach(x => {
+    const cls = order(x) === 0 ? "high" : order(x) === 1 ? "med" : "ok";
+    const label = x.issues.length ? x.issues.map(i => i.type).join(" + ") : "Consistent";
+    html += `<article class="finding ${cls}"><h3><span class="tag">${cls === "ok" ? "Consistent" : cls === "high" ? "Conflict" : "Warning"}</span>${label}</h3>
+      <div class="pair"><p><small>Document A</small>${hlModal(x.a)}</p><p><small>Document B</small>${hlModal(x.b)}</p></div>
+      ${x.issues.map(i => `<p class="fix"><b>Suggested fix:</b> ${esc(i.fix)}</p>`).join("")}</article>`;
+  });
+  box.innerHTML = html;
+}
+
+$("run").onclick = () => {
+  const A = $("a").value.trim(), B = $("b").value.trim();
+  if (!A || !B) { $("results").style.display = "block"; $("results").innerHTML = '<p class="empty">Add text to both documents, or choose Load sample.</p>'; return; }
+  render(analyze(A, B));
+};
+$("sample").onclick = () => { $("a").value = SAMPLE_A; $("b").value = SAMPLE_B; $("run").click(); };
+$("clear").onclick = () => { $("a").value = $("b").value = ""; $("results").style.display = "none"; };
+$("sample").click();
+</script>
+</body>
+</html>
